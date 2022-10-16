@@ -7,10 +7,6 @@
 TECHNOLOGY : Cloud Application 
 Team Id : PNT2022TMID51933
 ```
-##SOFTWARE REQUIREMENTS:
-```text
-Python, Flask , Docker
-```
 ##SYSTEM REQUIREMENT:
 ```text
 8GB RAM,Intel Core i3,OS-Windows/Linux/MAC ,Laptop or Desktop
