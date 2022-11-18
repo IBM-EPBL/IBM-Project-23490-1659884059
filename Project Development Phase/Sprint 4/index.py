@@ -5,6 +5,8 @@ from werkzeug.utils import secure_filename
 import ibm_db
 import re
 import os 
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
 import csv
 app=Flask(__name__)
 app.secret_key="don't share"
@@ -81,8 +83,8 @@ def home():
 	query="select count(*) from donor where status=1"
 	stmt = ibm_db.prepare(myconn, query)
 	ibm_db.execute(stmt)
-	data = ibm_db.fetch_assoc(stmt)
-	return render_template("index.html",data=data)
+	data = ibm_db.fetch_tuple(stmt)
+	return render_template("index.html",data=[data])
 
 
 
@@ -120,7 +122,7 @@ def register():
 			ibm_db.bind_param(stmt, 10, status)
 			ibm_db.execute(stmt)
 			msg = 'You have successfully Logged In!!'
-			return render_template('view2.html', msg=msg)
+			return redirect(url_for('viewall'))
 			
 		else:
 			flash("Already Registered")
@@ -137,8 +139,12 @@ def view():
 	query="select * from donor where status=1"
 	stmt = ibm_db.prepare(myconn, query)
 	ibm_db.execute(stmt)
-	data = ibm_db.fetch_tuple(stmt)
-	return render_template("view.html",data=[data])
+	data=[]
+	tuple = ibm_db.fetch_tuple(stmt)
+	while tuple!=False:
+		data.append(tuple)
+		tuple=ibm_db.fetch_tuple(stmt)	
+	return render_template("view.html",data=data)
 
 
 
@@ -215,21 +221,28 @@ def view2():
 	query="select distinct blood_group from donor where status=1"
 	stmt = ibm_db.prepare(myconn, query)
 	ibm_db.execute(stmt)
-	data = ibm_db.fetch_assoc(stmt)
+	data=[]
+	tuple = ibm_db.fetch_tuple(stmt)
+	while tuple!=False:
+		data.append(tuple)
+		tuple=ibm_db.fetch_tuple(stmt)
 	return render_template("select.html",data=data)
 
 
 @app.route("/viewselected",methods=['GET','POST'])
 def viewselected():
 	blood_group=request.form['blood_group']
-	cur=myconn.cursor()
 	query="select * from donor where blood_group= ? and status=1"
 	stmt = ibm_db.prepare(myconn, query)
 	ibm_db.bind_param(stmt, 1, blood_group)
 	ibm_db.execute(stmt)
-	data = ibm_db.fetch_assoc(stmt)
+	data=[]
+	tuple = ibm_db.fetch_tuple(stmt)
+	while tuple!=False:
+		data.append(tuple)
+		tuple=ibm_db.fetch_tuple(stmt)
 	return render_template("view2.html",data=data)
-
+	
 
 @app.route("/viewall",methods=['GET','POST'])
 def viewall():
@@ -237,9 +250,12 @@ def viewall():
 	query="select * from donor where status=1"
 	stmt = ibm_db.prepare(myconn, query)
 	ibm_db.execute(stmt)
-	data = ibm_db.fetch_tuple(stmt)
-	print(data)
-	return render_template("view2.html",data=[data])
+	data=[]
+	tuple = ibm_db.fetch_tuple(stmt)
+	while tuple!=False:
+		data.append(tuple)
+		tuple=ibm_db.fetch_tuple(stmt)
+	return render_template("view2.html",data=data)
 
 
 @app.route("/")
@@ -248,29 +264,23 @@ def send():
 	if request.method=="POST":
 		id=request.form['send']
 
-		query="select phno from donor where sno=?"
+		query="select email from donor where sno=?"
 		
 		stmt = ibm_db.prepare(myconn, query)
 		ibm_db.bind_param(stmt, 1, id)
 		ibm_db.execute(stmt)
 		data = ibm_db.fetch_assoc(stmt)
-
-		
-		account_sid = 'xxxxxxxxxxxxxxxxxxx' 
-		auth_token = 'xxxxxxxxxxxxxxxxxxxxx' 
-		client = Client(account_sid, auth_token) 
- 
-		message = client.messages.create( 
-		                              from_='xxxxxxxxxxxx',  
-		                              body='hi donor..!'
-		                              		'There is an aurgent need of blood of your group. Kindly help us. ' 
-		                              		'Looking forward for your help',      
-		                              to='+91'+str(data) 
-		                          ) 
-		if message.sid:
-			flash("Message sent successfully")
-		
-		return redirect(url_for("view2"))
+		print(data) 
+		message = Mail(from_email='empire44440@gmail.com',to_emails=data['EMAIL'],subject='Hi Donor!!!',html_content='<strong>We searching for a plasma donor and last we found your match is safe with our patient.Kindly contact us at your convenience</strong>')
+		try:
+			sg = SendGridAPIClient('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')
+			response = sg.send(message)
+			print(response.status_code)
+			print(response.body)
+			print(response.headers)
+		except Exception as e:
+			print(e)
+	return redirect('/viewall')
 
 
 @app.route("/logout")
